@@ -156,7 +156,7 @@ class ASRDiarizationPipeline:
             # find the ASR end timestamp that is closest to the diarizer's end timestamp and cut the transcript to here
             try:
                 upto_idx = np.argmin(np.abs(end_timestamps - end_time))
-            except ValueError:
+            except:
                 continue
 
             # find the ASR end timestamp that is closest to the diarizer's end timestamp
