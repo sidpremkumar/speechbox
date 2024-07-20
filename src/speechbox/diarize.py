@@ -11,9 +11,9 @@ from transformers.pipelines.audio_utils import ffmpeg_read
 
 class ASRDiarizationPipeline:
     def __init__(
-            self,
-            asr_pipeline,
-            diarization_pipeline,
+        self,
+        asr_pipeline,
+        diarization_pipeline,
     ):
         self.asr_pipeline = asr_pipeline
         self.sampling_rate = asr_pipeline.feature_extractor.sampling_rate
@@ -22,13 +22,13 @@ class ASRDiarizationPipeline:
 
     @classmethod
     def from_pretrained(
-            cls,
-            asr_model: Optional[str] = "openai/whisper-medium",
-            *,
-            diarizer_model: Optional[str] = "pyannote/speaker-diarization",
-            chunk_length_s: Optional[int] = 30,
-            use_auth_token: Optional[Union[str, bool]] = True,
-            **kwargs,
+        cls,
+        asr_model: Optional[str] = "openai/whisper-medium",
+        *,
+        diarizer_model: Optional[str] = "pyannote/speaker-diarization",
+        chunk_length_s: Optional[int] = 30,
+        use_auth_token: Optional[Union[str, bool]] = True,
+        **kwargs,
     ):
         asr_pipeline = pipeline(
             "automatic-speech-recognition",
@@ -41,10 +41,10 @@ class ASRDiarizationPipeline:
         return cls(asr_pipeline, diarization_pipeline)
 
     def __call__(
-            self,
-            inputs: Union[np.ndarray, List[np.ndarray]],
-            group_by_speaker: bool = True,
-            **kwargs,
+        self,
+        inputs: Union[np.ndarray, List[np.ndarray]],
+        group_by_speaker: bool = True,
+        **kwargs,
     ):
         """
         Transcribe the audio sequence(s) given as inputs to text and label with speaker information. The input audio
@@ -86,12 +86,13 @@ class ASRDiarizationPipeline:
                 - **timestamps** (`tuple`) -- The start and end time for the chunk / segment.
         """
         kwargs_asr = {
-            argument[len("asr_"):]: value for argument, value in kwargs.items() if argument.startswith("asr_")
+            argument[len("asr_") :]: value for argument, value in kwargs.items() if argument.startswith("asr_")
         }
 
         kwargs_diarization = {
-            argument[len("diarization_"):]: value for argument, value in kwargs.items() if
-            argument.startswith("diarization_")
+            argument[len("diarization_") :]: value
+            for argument, value in kwargs.items()
+            if argument.startswith("diarization_")
         }
 
         inputs, diarizer_inputs = self.preprocess(inputs)
@@ -103,9 +104,7 @@ class ASRDiarizationPipeline:
 
         segments = []
         for segment, track, label in diarization.itertracks(yield_label=True):
-            segments.append({'segment': {'start': segment.start, 'end': segment.end},
-                             'track': track,
-                             'label': label})
+            segments.append({"segment": {"start": segment.start, "end": segment.end}, "track": track, "label": label})
 
         # diarizer output may contain consecutive segments from the same speaker (e.g. {(0 -> 1, speaker_1), (1 -> 1.5, speaker_1), ...})
         # we combine these segments to give overall timestamps for each speaker's turn (e.g. {(0 -> 1.5, speaker_1), ...})
@@ -154,6 +153,11 @@ class ASRDiarizationPipeline:
         for segment in new_segments:
             # get the diarizer end timestamp
             end_time = segment["segment"]["end"]
+            # find the ASR end timestamp that is closest to the diarizer's end timestamp and cut the transcript to here
+            try:
+                upto_idx = np.argmin(np.abs(end_timestamps - end_time))
+            except ValueError:
+                continue
 
             # find the ASR end timestamp that is closest to the diarizer's end timestamp
             # only if the ending timestamp is not None
@@ -164,7 +168,7 @@ class ASRDiarizationPipeline:
                     segmented_preds.append(
                         {
                             "speaker": segment["speaker"],
-                            "text": "".join([chunk["text"] for chunk in transcript[:upto_idx + 1]]),
+                            "text": "".join([chunk["text"] for chunk in transcript[: upto_idx + 1]]),
                             "timestamp": (transcript[0]["timestamp"][0], transcript[upto_idx]["timestamp"][1]),
                         }
                     )
@@ -173,8 +177,8 @@ class ASRDiarizationPipeline:
                         segmented_preds.append({"speaker": segment["speaker"], **transcript[i]})
 
                 # crop the transcripts and timestamp lists according to the latest timestamp (for faster argmin)
-                transcript = transcript[upto_idx + 1:]
-                end_timestamps = end_timestamps[upto_idx + 1:]
+                transcript = transcript[upto_idx + 1 :]
+                end_timestamps = end_timestamps[upto_idx + 1 :]
 
         return segmented_preds
 
